@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="brain.svg">
+  <title>Chatty</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom scrollbar styles */
+    #chat-box::-webkit-scrollbar {
+      width: 8px;
+    }
+    #chat-box::-webkit-scrollbar-track {
+      background: #1f2937; /* Tailwind gray-800 */
+      border-radius: 9999px;
+    }
+    #chat-box::-webkit-scrollbar-thumb {
+      background-color: #3b82f6; /* Tailwind blue-500 */
+      border-radius: 9999px;
+      border: 2px solid #1f2937;
+    }
+
+    /* For Firefox */
+    #chat-box {
+      scrollbar-width: thin;
+      scrollbar-color: #3b82f6 #1f2937;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-screen p-6">
+  <h1 class="text-3xl font-bold text-start">Chatty</h1>
+  <h6 class="text-xs text-gray-400 mb-4 font-semibold text-start">Your AI Assistant. Powered by Gemini AI Studio.</h6>
+  <div id="chat-box" class="flex-1 overflow-auto border border-gray-700 rounded-lg p-6 mb-6 space-y-4 scroll-smooth"></div>
+
+  <form id="chat-form" class="flex items-center gap-3 max-w-3xl mx-auto w-full">
+    <input
+      id="input-msg"
+      class="flex-grow rounded-full px-5 py-3 text-black text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      type="text"
+      placeholder="Type your message..."
+      autocomplete="off"
+      required
+    />
+    <button
+      type="submit"
+      class="bg-blue-600 hover:bg-blue-700 transition-colors rounded-full p-3 flex items-center justify-center flex-shrink-0"
+      aria-label="Send message"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+    </button>
+  </form>
+
+  <script>
+    const chatBox = document.getElementById("chat-box");
+    const chatForm = document.getElementById("chat-form");
+    const inputMsg = document.getElementById("input-msg");
+
+    function smoothScrollToBottom() {
+      chatBox.scrollTo({
+        top: chatBox.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+
+    /*
+    function addMessage(role, text, withTypingEffect = false) {
+      const div = document.createElement("div");
+      div.className = role === "user" ? "text-right" : "text-left";
+
+      const span = document.createElement("span");
+      span.className = `inline-block rounded-xl px-4 py-3 max-w-[80%] break-words whitespace-pre-wrap ${
+        role === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200"
+      }`;
+
+      div.appendChild(span);
+      chatBox.appendChild(div);
+
+      if (!withTypingEffect) {
+        span.textContent = text;
+        smoothScrollToBottom();
+      } else {
+        // typing effect for the model's reply
+        span.textContent = "";
+        let i = 0;
+        const interval = setInterval(() => {
+          span.textContent += text.charAt(i);
+          i++;
+          smoothScrollToBottom();
+          if (i >= text.length) clearInterval(interval);
+        }, 20);
+      }
+    }
+    */
+    
+ function addMessage(role, text, withTypingEffect = false) {
+  const div = document.createElement("div");
+  div.className = role === "user" ? "text-right" : "text-left";
+
+  const span = document.createElement("span");
+  span.className = `inline-block rounded-xl px-4 py-3 max-w-[80%] break-words whitespace-pre-wrap ${
+    role === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200"
+  }`;
+
+  // Detect code blocks and apply custom styling
+  const formattedText = text
+    .replace(/```([\s\S]*?)```/g, (_, code) => {
+      return `<pre class="bg-black text-green-400 text-sm p-4 my-2 rounded-md overflow-auto"><code>${escapeHtml(code)}</code></pre>`;
+    })
+    .replace(/`([^`]+)`/g, (_, inline) => {
+      return `<code class="bg-gray-800 text-green-300 px-1 rounded">${escapeHtml(inline)}</code>`;
+    });
+
+  if (!withTypingEffect) {
+    span.innerHTML = formattedText;
+    div.appendChild(span);
+    chatBox.appendChild(div);
+    smoothScrollToBottom();
+  } else {
+    span.innerHTML = "";
+    div.appendChild(span);
+    chatBox.appendChild(div);
+
+    // Typing effect with HTML preserved
+    const temp = document.createElement("div");
+    temp.innerHTML = formattedText;
+    const chars = [...temp.innerText];
+    let i = 0;
+    const interval = setInterval(() => {
+      span.textContent += chars[i];
+      i++;
+      smoothScrollToBottom();
+      if (i >= chars.length) clearInterval(interval);
+    }, 20);
+  }
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const message = inputMsg.value.trim();
+      if (!message) return;
+
+      addMessage("user", message);
+      inputMsg.value = "";
+      inputMsg.focus();
+
+      try {
+        const res = await fetch("http://172.17.20.6:5000/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+
+        const data = await res.json();
+        if (data.reply) {
+          addMessage("model", data.reply, true); // typing effect
+        } else {
+          addMessage("model", "Error: No reply");
+        }
+      } catch (error) {
+        addMessage("model", "Error: " + error.message);
+      }
+    });
+  </script>
+</body>
+</html>
