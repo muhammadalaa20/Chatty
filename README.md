@@ -6,7 +6,7 @@ An AI assistant powered by Gemini AI studio.
 
 
 ## 🛠 Skills
-Javascript, HTML, CSS and Python
+Javascript, HTML, CSS, TailwindCSS and Python
 
 
 ## Deployment
